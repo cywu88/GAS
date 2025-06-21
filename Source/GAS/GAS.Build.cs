@@ -20,7 +20,9 @@ public class GAS : ModuleRules
 			"UMG"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] {
+			"GameplayAbilities",
+		});
 
 		PublicIncludePaths.AddRange(new string[] {
 			"GAS",

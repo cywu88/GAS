@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "GASCharacter.h"
+#include "GAS.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -10,11 +11,15 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbility_CharacterJump.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 AGASCharacter::AGASCharacter()
 {
+	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("UAbilitySystemComponent"));
+	
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		
@@ -51,14 +56,47 @@ AGASCharacter::AGASCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
+
+UAbilitySystemComponent* AGASCharacter::GetAbilitySystemComponent() const
+{
+	return AbilitySystemComponent;	
+}
+
+void AGASCharacter::Input_Ability_Jump_Pressed()
+{
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->AbilityLocalInputPressed(static_cast<int32>(EGASAbilityInputID::Jump));
+	}
+}
+
+void AGASCharacter::Input_Ability_Jump_Released()
+{
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->AbilityLocalInputReleased(static_cast<int32>(EGASAbilityInputID::Jump));
+	}
+}
+
 void AGASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
+
+		if(IsValid(AbilitySystemComponent))
+		{
+			//FGameplayAbilityInputBinds Binds(FString(), FString(), FString(TEXT("ETriggerEvent")),
+					//static_cast<int32>(EGASAbilityInputID::None), static_cast<int32>(EGASAbilityInputID::None) );
+			//AbilitySystemComponent->BindAbilityActivationToInputComponent(PlayerInputComponent,Binds);
+
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AGASCharacter::Input_Ability_Jump_Pressed);
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AGASCharacter::Input_Ability_Jump_Released);
+		}
+		
 		
 		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		//EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+		//EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AGASCharacter::Move);
@@ -70,6 +108,32 @@ void AGASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 	else
 	{
 		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+	}
+}
+
+void AGASCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	// 1. 初始化 GAS 信息（一定要做）
+	AbilitySystemComponent->InitAbilityActorInfo(this, this);
+
+	// 2. 给能力（服务器端）
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		if (IsValid(AbilitySystemComponent))
+		{
+			AbilitySystemComponent->GiveAbility(
+				FGameplayAbilitySpec(UGameplayAbility_CharacterJump::StaticClass(), 1, static_cast<int32>(EGASAbilityInputID::Jump))
+			);
+
+			if (SprintAbility)
+			{
+				AbilitySystemComponent->GiveAbility(
+					FGameplayAbilitySpec(SprintAbility, 1, static_cast<int32>(EGASAbilityInputID::Sprint), this)
+				);
+			}
+		}
 	}
 }
 

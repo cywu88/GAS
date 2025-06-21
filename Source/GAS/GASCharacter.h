@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "AbilitySystemInterface.h"
 #include "GASCharacter.generated.h"
 
 class USpringArmComponent;
@@ -19,7 +20,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
  *  Implements a controllable orbiting camera
  */
 UCLASS(abstract)
-class AGASCharacter : public ACharacter
+class AGASCharacter : public ACharacter, public  IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -49,13 +50,30 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	UInputAction* MouseLookAction;
 
+	
 public:
 
 	/** Constructor */
-	AGASCharacter();	
+	AGASCharacter();
 
+	void Input_Ability_Jump_Pressed();
+
+	void Input_Ability_Jump_Released();
+	
+	virtual class UAbilitySystemComponent*  GetAbilitySystemComponent() const override;
+
+	//virtual void ProcessedBy(AController* NewController) override;
+
+	virtual void PossessedBy(AController* NewController) override;
+ 
 protected:
 
+	UPROPERTY()
+	class UAbilitySystemComponent* AbilitySystemComponent;
+
+	UPROPERTY(BlueprintReadOnly,EditAnywhere)
+	TSubclassOf<class UGameplayAbility> SprintAbility;
+	
 	/** Initialize input action bindings */
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
@@ -67,6 +85,7 @@ protected:
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
+	
 public:
 
 	/** Handles move inputs from either controls or UI interfaces */
